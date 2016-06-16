@@ -2,7 +2,7 @@ local bump = require 'bump/bump'
 
 local world = bump.newWorld(64)
 
-local level = require 'test_level'
+local level = {}
 
 Vector = {}
 Vector.__index = Vector
@@ -18,11 +18,11 @@ function Vector:init(x, y)
     self.y = y
 end
 
-camera = Vector(0,0)
-scale = 3
-gravity = 180
+local camera = Vector(0,0)
+local scale = 3
+local gravity = 180
 
-player = {
+local player = {
     pos = Vector(0,0),
     velocity = Vector(0,0),
     grounded = false,
@@ -96,15 +96,15 @@ function MovingPlatform:update(dt)
 	
 end
 ]]
-platforms = {}
-quads = {}
-tileset = {}
+local platforms = {}
+local quads = {}
+local tileset = {}
 
 function love.load()
 	love.graphics.setDefaultFilter('nearest', 'nearest', 1)
 	camera.width = love.graphics.getWidth() / scale
 	camera.height = love.graphics.getHeight() / scale
-	loadLevel()
+	loadLevel("test_level")
 end
 
 function love.update(dt)
@@ -137,8 +137,9 @@ function love.draw()
 	drawTiles()
 end
 
-function loadLevel()
-	tileset.img = love.graphics.newImage("Tileset.png")
+function loadLevel(level_name)
+	level = require(level_name)
+	tileset.img = love.graphics.newImage(level.tilesets[1].image)
 	local margin, spacing = level.tilesets[1].margin, level.tilesets[1].spacing
 	tileset.width = math.floor((tileset.img:getWidth() - margin) / (level.tilewidth + spacing))
 	tileset.height = math.floor((tileset.img:getHeight() - margin) / (level.tileheight + spacing))
@@ -148,12 +149,16 @@ function loadLevel()
 			table.insert(quads, love.graphics.newQuad(x, y, level.tilewidth, level.tileheight, tileset.img:getWidth(), tileset.img:getHeight()))
 		end
 	end
-	for i, obj in ipairs(level.layers[2].objects) do
-		if obj.type == 'Player' then
-			player.pos.x, player.pos.y = obj.x, obj.y
-			world:add(player, player.pos.x, player.pos.y, player.width, player.height)
-		elseif obj.type == 'Platform' then
-		    table.insert(platforms, Platform(obj.x,obj.y,obj.width,obj.height))
+	for i, layer in ipairs(level.layers) do
+		if layer.type == 'objectgroup' then
+			for j, obj in ipairs(layer.objects) do
+				if obj.type == 'Player' then
+					player.pos.x, player.pos.y = obj.x, obj.y
+					world:add(player, player.pos.x, player.pos.y, player.width, player.height)
+				elseif obj.type == 'Platform' then
+				    table.insert(platforms, Platform(obj.x,obj.y,obj.width,obj.height))
+				end
+			end
 		end
 	end
 end
@@ -165,9 +170,13 @@ function drawTiles()
 	for i = start_y, end_y do
 		for j = start_x, end_x do
 			local level_index = math.floor(i * level.width) + j
-			local quad_index = level.layers[1].data[level_index + 1]
-			if quad_index ~= 0 then
-				love.graphics.draw(tileset.img, quads[quad_index], (j * level.tilewidth) - camera.x, (i * level.tileheight) - camera.y)
+			for k, layer in ipairs(level.layers) do
+				if layer.type == 'tilelayer' then
+					local quad_index = layer.data[level_index + 1]
+					if quad_index ~= 0 then
+						love.graphics.draw(tileset.img, quads[quad_index], (j * level.tilewidth) - camera.x, (i * level.tileheight) - camera.y)
+					end
+				end
 			end
 		end
 	end
